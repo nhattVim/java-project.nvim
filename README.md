@@ -15,7 +15,7 @@ A folk of [pojokcodeid/auto-java-project.nvim](https://github.com/pojokcodeid/au
 -- lua with lazy.nvim
 return {
     "nhattVim/java-project.nvim",
-    opts = {},
+    config = true,
     cmd = {
         "NewMavenProject",
         "NewGradleProject",
