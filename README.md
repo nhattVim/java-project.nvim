@@ -11,9 +11,10 @@ A folk of [pojokcodeid/auto-java-project.nvim](https://github.com/pojokcodeid/au
 
 ### Installation
 
-```
+```lua
+-- lua with lazy.nvim
 return {
-    "nhattVim/java_project.nvim",
+    "nhattVim/java-project.nvim",
     opts = {},
     cmd = {
         "NewMavenProject",
