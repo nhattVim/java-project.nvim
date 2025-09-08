@@ -66,9 +66,9 @@ local function mvn_new_project()
     -- Step 3: Archetype Selection
     -------------------------
     local POPULAR_ARCHETYPES = {
-        "maven-archetype-quickstart",
-        "maven-archetype-webapp",
-        "maven-archetype-simple",
+        { group = "org.apache.maven.archetypes", artifact = "maven-archetype-quickstart" },
+        { group = "org.apache.maven.archetypes", artifact = "maven-archetype-webapp" },
+        { group = "org.apache.maven.archetypes", artifact = "maven-archetype-simple" },
     }
     local CACHE_FILE = vim.fn.stdpath("cache") .. "/maven_archetypes.json"
 
@@ -94,8 +94,12 @@ local function mvn_new_project()
     end
 
     -- Fetch latest versions from Maven Central
-    local function get_archetype_versions(artifact)
-        local url = "https://search.maven.org/solrsearch/select?q=a:" .. artifact .. "&core=gav&rows=10&wt=json"
+    local function get_archetype_versions(group, artifact)
+        local url = string.format(
+            'https://search.maven.org/solrsearch/select?q=g:"%s"+AND+a:"%s"&core=gav&rows=10&wt=json',
+            group,
+            artifact
+        )
         local cmd = 'curl -s --max-time 10 "' .. url .. '"'
         local output = vim.fn.system(cmd)
         local ok, data = pcall(vim.fn.json_decode, output)
@@ -103,12 +107,12 @@ local function mvn_new_project()
         if ok and data and data.response and data.response.docs then
             for _, doc in ipairs(data.response.docs) do
                 if doc.v then
-                    table.insert(versions, doc.v)
+                    table.insert(versions, { group = doc.g, artifact = doc.a, version = doc.v })
                 end
             end
         end
         table.sort(versions, function(a, b)
-            return a > b
+            return a.version > b.version
         end)
         local latest = {}
         for i = 1, math.min(5, #versions) do
@@ -125,16 +129,17 @@ local function mvn_new_project()
         end
         notify_msg("Fetching latest archetypes from Maven Central...", "info")
         local archetypes = {}
-        for _, artifact in ipairs(POPULAR_ARCHETYPES) do
-            local versions = get_archetype_versions(artifact)
+        for _, def in ipairs(POPULAR_ARCHETYPES) do
+            local versions = get_archetype_versions(def.group, def.artifact)
             if #versions > 0 then
-                for _, v in ipairs(versions) do
-                    table.insert(archetypes, { artifact = artifact, version = v })
-                end
+                vim.list_extend(archetypes, versions)
             end
         end
         if #archetypes == 0 then
-            table.insert(archetypes, { artifact = "maven-archetype-quickstart", version = "1.5" })
+            table.insert(
+                archetypes,
+                { group = "org.apache.maven.archetypes", artifact = "maven-archetype-quickstart", version = "1.5" }
+            )
             notify_msg("Could not fetch archetypes, using default.", "warn")
         else
             save_cache(archetypes)
@@ -143,31 +148,36 @@ local function mvn_new_project()
     end
 
     local function choose_archetype(archetypes)
-        local unique = {}
-        local seen = {}
+        local unique, seen = {}, {}
         for _, arch in ipairs(archetypes) do
-            if not seen[arch.artifact] then
-                table.insert(unique, arch.artifact)
-                seen[arch.artifact] = true
+            local artifact = arch.artifact
+            if not seen[artifact] then
+                table.insert(unique, { group = arch.group, artifact = artifact })
+                seen[artifact] = true
             end
         end
+
         local choices = {}
-        for i, a in ipairs(unique) do
-            table.insert(choices, string.format("%d: %s", i, a))
+        for i, arch_info in ipairs(unique) do
+            table.insert(choices, string.format("%d: %s", i, arch_info.artifact))
         end
+
         local sel = vim.fn.input(table.concat(choices, "\n") .. "\nSelect archetype: ", "1")
         local idx = tonumber(sel)
+
         if not idx or idx < 1 or idx > #unique then
             notify_msg("Invalid selection, using default archetype", "warn")
-            return unique[1]
+            return unique[1].group .. ":" .. unique[1].artifact
         end
-        return unique[idx]
+
+        return unique[idx].group .. ":" .. unique[idx].artifact
     end
 
-    local function choose_version(selected_artifact, archetypes)
+    local function choose_version(selected_ga, archetypes)
         local versions = {}
+        local selected_group, selected_artifact = unpack(vim.split(selected_ga, ":"))
         for _, arch in ipairs(archetypes) do
-            if arch.artifact == selected_artifact then
+            if arch.group == selected_group and arch.artifact == selected_artifact then
                 table.insert(versions, arch.version)
             end
         end
@@ -180,16 +190,16 @@ local function mvn_new_project()
         local idx = tonumber(sel)
         if not idx or idx < 1 or idx > #versions then
             notify_msg("Invalid selection, using latest version", "warn")
-            return versions[1]
+            return versions[1], selected_group, selected_artifact
         end
-        return versions[idx]
+        return versions[idx], selected_group, selected_artifact
     end
 
     local available_archetypes = get_available_archetypes()
-    local selected_archetype = choose_archetype(available_archetypes)
-    local selected_version = choose_version(selected_archetype, available_archetypes)
+    local selected_ga = choose_archetype(available_archetypes)
+    local selected_version, selected_group, selected_artifact = choose_version(selected_ga, available_archetypes)
 
-    if not selected_archetype or not selected_version then
+    if not selected_artifact or not selected_version then
         return
     end
 
@@ -205,10 +215,11 @@ local function mvn_new_project()
     -- Step 5: Run Maven Command
     -------------------------
     local mvn_cmd = string.format(
-        'mvn archetype:generate "-DgroupId=%s" "-DartifactId=%s" "-DarchetypeArtifactId=%s" "-DarchetypeVersion=%s" "-DinteractiveMode=%s"',
+        'mvn archetype:generate "-DgroupId=%s" "-DartifactId=%s" "-DarchetypeGroupId=%s" "-DarchetypeArtifactId=%s" "-DarchetypeVersion=%s" "-DinteractiveMode=%s"',
         group_id,
         artifact_id,
-        selected_archetype,
+        selected_group,
+        selected_artifact,
         selected_version,
         interactive_mode
     )
