@@ -1,94 +1,59 @@
+local U = require("java_project.utils")
+
 ---@diagnostic disable: undefined-field, param-type-mismatch
 local function gradle_new_project()
     -------------------------
-    -- Utility Functions
+    -- Step 0: Check Requirements
     -------------------------
-    local function notify_msg(message, level)
-        local ok, notify = pcall(require, "notify")
-        if ok then
-            notify(message, level, { timeout = 3000 })
-        else
-            -- Fallback to print for users without nvim-notify
-            print("[" .. (level or "info") .. "] " .. message)
-        end
-    end
-
-    local function get_input(prompt, default)
-        vim.fn.inputsave()
-        local result = vim.fn.input(prompt, default)
-        vim.fn.inputrestore()
-        if result == "" then
-            notify_msg("Input canceled.", "info")
-            return nil, true
-        end
-        return result, false
-    end
-
-    local function get_last_dir(path)
-        -- This helper gets the final component of a path, cross-platform
-        local uname = vim.loop.os_uname().sysname
-        if uname == "Windows_NT" then
-            return path:match("([^\\]+)$")
-        else
-            return path:match("([^/]+)$")
-        end
-    end
+    U.check_requirements({ "gradle", "java" })
 
     -------------------------
     -- Step 1: Project Directory
     -------------------------
-    local project_dir, canceled = get_input("Enter project directory: ", vim.fn.getcwd())
+    local project_dir, canceled = U.input("Enter project directory: ", vim.fn.getcwd())
     if canceled or not project_dir then
         return
     end
 
-    -- Create the directory if it doesn't exist
-    if vim.fn.isdirectory(project_dir) == 0 then
-        if vim.fn.mkdir(project_dir, "p") == 0 then
-            notify_msg("Failed to create project directory: " .. project_dir, "error")
-            return
-        end
-        notify_msg("Created directory: " .. project_dir, "info")
+    -- Check if the project directory already exists
+    if not U.prepare_dir(project_dir) then
+        return
     end
 
     -- Change into the project directory. Gradle works from *within* the project root.
-    local ok, err = pcall(vim.cmd, "cd " .. project_dir)
-    if not ok then
-        notify_msg("Error changing directory to " .. project_dir .. ": " .. err, "error")
-        return
-    end
-    notify_msg("Changed directory to: " .. project_dir, "info")
+    U.chdir(project_dir)
 
     -------------------------
     -- Step 2: Gradle Parameters
     -------------------------
-    -- Project Type
-    local project_type, canceled_type =
-        get_input("Project type (java-application, java-library, etc.): ", "java-application")
+    local project_types = { "java-application", "java-gradle-plugin", "java-library" }
+    local script_dsls = { "groovy", "kotlin" }
+    local test_frameworks = { "junit-jupiter", "spock", "junit" }
+
+    local project_type, canceled_type = U.select_choice("Project type: ", project_types, "java-application")
     if canceled_type then
         return
     end
 
-    -- Script DSL
-    local script_dsl, canceled_dsl = get_input("Script DSL (groovy, kotlin): ", "groovy")
+    local script_dsl, canceled_dsl = U.select_choice("Script DSL: ", script_dsls, "groovy")
     if canceled_dsl then
         return
     end
 
     -- Test Framework
-    local test_framework, canceled_test = get_input("Testing framework (junit-jupiter, spock, etc.): ", "junit-jupiter")
+    local test_framework, canceled_test = U.select_choice("Testing framework: ", test_frameworks, "junit-jupiter")
     if canceled_test then
         return
     end
 
     -- Package Name
-    local package_name, canceled_package = get_input("Enter package name: ", "com.example")
+    local package_name, canceled_package = U.input("Enter package name: ", "com.example")
     if canceled_package then
         return
     end
 
     -- Project Name (defaults to the directory name)
-    local project_name = get_last_dir(project_dir)
+    local project_name = U.basename(project_dir)
 
     -------------------------
     -- Step 3: Run Gradle Command
@@ -103,20 +68,17 @@ local function gradle_new_project()
         project_name
     )
 
-    notify_msg("Running: " .. gradle_cmd, "info")
+    U.notify("Running: " .. gradle_cmd, "info")
 
-    -- Using systemlist to capture output for better error reporting
     local output = vim.fn.systemlist(gradle_cmd)
     if vim.v.shell_error ~= 0 then
-        notify_msg("Failed to create Gradle project:\n" .. table.concat(output, "\n"), "error")
+        U.notify("Failed to create Gradle project:\n" .. table.concat(output, "\n"), "error")
         return
     end
 
     -------------------------
     -- Step 4: Open Project in Neovim
     -------------------------
-    notify_msg("Gradle project created successfully!", "info")
-
     -- Refresh file explorer to show new files
     if vim.g.loaded_nvim_tree then
         vim.cmd("NvimTreeRefresh")
@@ -129,11 +91,13 @@ local function gradle_new_project()
 
         if vim.fn.filereadable(main_class_path) == 1 then
             vim.cmd(":edit " .. main_class_path)
-            notify_msg("Opening " .. main_class_path, "info")
+            U.notify("Opening " .. main_class_path, "info")
         else
-            notify_msg("Main class not found: " .. main_class_path, "warn")
+            U.notify("Main class not found: " .. main_class_path, "warn")
         end
     end
+
+    U.notify("Gradle project created successfully!", "info")
 end
 
 -- Create the Neovim user command
