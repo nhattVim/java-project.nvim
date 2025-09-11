@@ -5,7 +5,9 @@ local function gradle_new_project()
     -------------------------
     -- Step 0: Check Requirements
     -------------------------
-    U.check_requirements({ "gradle", "java" })
+    if not U.check_requirements({ "gradle", "java" }) then
+        return
+    end
 
     -------------------------
     -- Step 1: Project Directory
@@ -21,7 +23,9 @@ local function gradle_new_project()
     end
 
     -- Change into the project directory. Gradle works from *within* the project root.
-    U.chdir(project_dir)
+    if not U.chdir(project_dir) then
+        return
+    end
 
     -------------------------
     -- Step 2: Gradle Parameters

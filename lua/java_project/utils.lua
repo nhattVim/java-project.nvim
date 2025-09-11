@@ -75,9 +75,10 @@ U.check_requirements = function(requirements)
     for _, cmd in ipairs(requirements) do
         if vim.fn.executable(cmd) == 0 then
             U.notify("Requirement not found in PATH: " .. cmd .. ", Please install it first", "error")
-            return
+            return false
         end
     end
+    return true
 end
 
 U.prepare_dir = function(path)
@@ -115,9 +116,10 @@ U.chdir = function(path)
     local ok, err = pcall(vim.fn.chdir, path)
     if not ok then
         U.notify("Error changing directory: " .. err, "error")
-        return
+        return false
     end
     U.notify("Changed directory to: " .. path, "info")
+    return true
 end
 
 U.get_gradle_params = function()

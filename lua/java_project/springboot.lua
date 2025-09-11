@@ -4,7 +4,9 @@ local function springboot_new_project()
     -------------------------
     -- Step 0: Check Requirements
     -------------------------
-    U.check_requirements({ "curl", "spring" })
+    if not U.check_requirements({ "curl", "spring" }) then
+        return
+    end
 
     -------------------------
     -- Step 1: Fetch Metadata from start.spring.io
@@ -44,7 +46,9 @@ local function springboot_new_project()
         return
     end
 
-    U.chdir(vim.fn.fnamemodify(project_dir, ":h"))
+    if not U.chdir(vim.fn.fnamemodify(project_dir, ":h")) then
+        return
+    end
 
     -------------------------
     -- Step 3: Project Parameters
@@ -150,7 +154,10 @@ local function springboot_new_project()
     -----------------------
     -- Step 5: Open Project in Neovim
     -----------------------
-    U.chdir(project_dir)
+    if not U.chdir(project_dir) then
+        U.notify("Failed to change directory to: " .. project_dir, "error")
+        return
+    end
 
     if vim.g.loaded_nvim_tree then
         vim.cmd("NvimTreeRefresh")

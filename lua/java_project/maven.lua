@@ -4,7 +4,9 @@ local function mvn_new_project()
     -------------------------
     -- Step 0: Check Requirements
     -------------------------
-    U.check_requirements({ "curl", "mvn", "java" })
+    if not U.check_requirements({ "curl", "mvn", "java" }) then
+        return
+    end
 
     -------------------------
     -- Step 1: Project Directory
@@ -14,11 +16,15 @@ local function mvn_new_project()
         return
     end
 
+    -- Check if the project directory already exists
     if not U.prepare_dir(project_dir) then
         return
     end
 
-    U.chdir(vim.fn.fnamemodify(project_dir, ":h"))
+    -- Change into the parent directory to excute Maven
+    if not U.chdir(vim.fn.fnamemodify(project_dir, ":h")) then
+        return
+    end
 
     -------------------------
     -- Step 2: Maven Coordinates
@@ -199,7 +205,10 @@ local function mvn_new_project()
     -------------------------
     -- Step 6: Open Project in Neovim
     -------------------------
-    U.chdir(project_dir)
+    if not U.chdir(project_dir) then
+        U.notify("Failed to change directory to: " .. project_dir, "error")
+        return
+    end
 
     if group_id and group_id ~= "" then
         local java_path = group_id:gsub("%.", "/")
