@@ -1,5 +1,55 @@
 local U = require("java_project.utils")
 
+local function select_dependencies(dep_metadata)
+    local categories = {}
+    local category_map = {}
+
+    for _, group in ipairs(dep_metadata.values) do
+        table.insert(categories, group.name)
+        category_map[group.name] = group.values
+    end
+
+    local selected_deps = {}
+
+    while true do
+        -- show selected
+        local msg = (#selected_deps > 0) and ("Selected: " .. table.concat(selected_deps, ", "))
+            or "No dependencies selected yet."
+        U.notify(msg, "info")
+
+        -- choose category
+        local cat_idx, cat_cancel = U.select_choice("Select category (ESC to finish):", categories)
+        if cat_cancel then
+            break
+        end
+        local category = categories[cat_idx]
+
+        -- deps in group
+        local deps = {}
+        for _, dep in ipairs(category_map[category]) do
+            table.insert(deps, dep.id .. " - " .. dep.name)
+        end
+
+        local dep_idx, dep_cancel = U.select_choice("Toggle dependency (ESC to skip):", deps)
+        if not dep_cancel then
+            local dep_id = category_map[category][dep_idx].id
+            if vim.tbl_contains(selected_deps, dep_id) then
+                -- remove
+                selected_deps = vim.tbl_filter(function(x)
+                    return x ~= dep_id
+                end, selected_deps)
+                U.notify("❌ Removed: " .. dep_id, "warn")
+            else
+                -- add
+                table.insert(selected_deps, dep_id)
+                U.notify("✅ Added: " .. dep_id, "info")
+            end
+        end
+    end
+
+    return table.concat(selected_deps, ",")
+end
+
 local function springboot_new_project()
     -------------------------
     -- Step 0: Check Requirements
@@ -109,9 +159,10 @@ local function springboot_new_project()
     end
     local packaging = packagings[pack_idx]
 
-    local dependencies, deps_canceled = U.input("Enter dependencies (comma-separated): ", "web,lombok,data-jpa,h2")
-    if deps_canceled then
-        return
+    local dependencies = select_dependencies(metadata.dependencies)
+    if dependencies == "" then
+        U.notify("No dependencies selected.", "warn")
+        dependencies = "web"
     end
 
     -------------------------
