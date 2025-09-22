@@ -122,25 +122,4 @@ U.chdir = function(path)
     return true
 end
 
-U.get_gradle_params = function()
-    local output = vim.fn.systemlist("gradle help --task init")
-    local params = { types = {}, dsls = {}, test_frameworks = {} }
-
-    local current_section = nil
-    for _, line in ipairs(output) do
-        if line:match("%-%-type") then
-            current_section = "types"
-        elseif line:match("%-%-dsl") then
-            current_section = "dsls"
-        elseif line:match("%-%-test%-framework") then
-            current_section = "test_frameworks"
-        elseif line:match("^%s+[%w%-]+") and current_section then
-            -- line kiểu "     java-application"
-            local val = vim.trim(line)
-            table.insert(params[current_section], val)
-        end
-    end
-    return params
-end
-
 return U

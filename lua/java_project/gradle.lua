@@ -1,6 +1,5 @@
 local U = require("java_project.utils")
 
----@diagnostic disable: undefined-field, param-type-mismatch
 local function gradle_new_project()
     -------------------------
     -- Step 0: Check Requirements
