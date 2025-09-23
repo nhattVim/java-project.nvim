@@ -17,6 +17,14 @@ local function capitalize(str)
     return (str and #str > 0) and (str:sub(1, 1):upper() .. str:sub(2)) or str
 end
 
+local function to_pascal_case(str)
+    local parts = {}
+    for word in str:gmatch("[^%-_]+") do
+        table.insert(parts, capitalize(word))
+    end
+    return table.concat(parts, "")
+end
+
 local function parse_boot_version(ver)
     local patterns = {
         { "%.RELEASE$", "" },
@@ -482,13 +490,13 @@ local function springboot_new_project()
             vim.cmd("NvimTreeRefresh")
         end
 
-        local main_class = capitalize(name:gsub("%-", "")) .. "Application." .. language
+        local main_class = to_pascal_case(artifact_id) .. "Application." .. language
         local main_class_path = string.format("src/main/java/%s/%s", package_name:gsub("%.", "/"), main_class)
 
         if vim.fn.filereadable(main_class_path) == 1 then
             vim.cmd(":edit " .. main_class_path)
         else
-            U.notify("Main class not found.", "warn")
+            U.notify("Main class not found." .. main_class_path, "warn")
         end
 
         U.notify("✅ Spring Boot project created successfully!", "info")
