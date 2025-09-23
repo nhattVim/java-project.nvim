@@ -70,23 +70,37 @@ local function render_ui()
         "",
     }
 
+    -- { {line, start, end, hl_group}, ... }
+    local highlights = {}
+
+    -- highlight title
+    table.insert(highlights, { 1, 0, -1, "Title" })
+    table.insert(highlights, { 2, 0, -1, "Title" })
+    table.insert(highlights, { 3, 0, -1, "Title" })
+
     if DepUI.search_term ~= "" then
-        table.insert(lines, "Searching for: '" .. DepUI.search_term .. "' (press '/' and Esc to clear)")
+        local search_line = "Searching for: '" .. DepUI.search_term .. "' (press '/' and Esc to clear)"
+        table.insert(lines, search_line)
         table.insert(lines, "")
+        table.insert(highlights, { #lines - 1, 0, -1, "Search" })
     end
 
     if #DepUI.deps > 0 then
         table.insert(lines, "Selected dependencies:")
+        table.insert(highlights, { #lines, 0, -1, "Question" })
         for _, dep_id in ipairs(DepUI.deps) do
             table.insert(lines, "   • " .. dep_id)
+            table.insert(highlights, { #lines, 0, -1, "String" })
         end
     else
         table.insert(lines, "No dependencies selected.")
+        table.insert(highlights, { #lines, 0, -1, "Comment" })
     end
     table.insert(lines, string.rep("─", 85))
 
     if #DepUI.category_names == 0 then
         table.insert(lines, "No results found.")
+        table.insert(highlights, { #lines, 0, -1, "Error" })
     end
 
     for i, cat in ipairs(DepUI.category_names) do
@@ -94,11 +108,33 @@ local function render_ui()
         table.insert(lines, prefix .. cat)
 
         if i == DepUI.active_category then
+            table.insert(highlights, { #lines, 0, -1, "Keyword" })
             for j, dep in ipairs(DepUI.categories[cat]) do
                 local dep_id = dep.id
                 local mark = vim.tbl_contains(DepUI.deps, dep_id) and "[✔]" or "[ ]"
                 local cursor = (j == DepUI.cursor_dep) and "➤" or " "
-                table.insert(lines, string.format("   %s %s %s - %s", cursor, mark, dep_id, dep.name))
+                local line = string.format("   %s %s %s - %s", cursor, mark, dep_id, dep.name)
+                table.insert(lines, line)
+
+                local is_cursor = j == DepUI.cursor_dep
+                local is_selected = vim.tbl_contains(DepUI.deps, dep_id)
+
+                local vis = vim.api.nvim_get_hl(0, { name = "Visual" }) or {}
+                local str = vim.api.nvim_get_hl(0, { name = "String" }) or {}
+                vim.api.nvim_set_hl(0, "SpringDepVisualString", {
+                    bg = vis.bg,
+                    fg = str.fg or vis.fg,
+                })
+
+                if is_cursor and is_selected then
+                    table.insert(highlights, { #lines, 0, -1, "SpringDepVisualString" })
+                elseif is_cursor then
+                    table.insert(highlights, { #lines, 0, -1, "Visual" })
+                elseif is_selected then
+                    table.insert(highlights, { #lines, 0, -1, "String" })
+                else
+                    table.insert(highlights, { #lines, 0, -1, "Normal" })
+                end
             end
         end
     end
@@ -106,6 +142,16 @@ local function render_ui()
     vim.bo[DepUI.buf].modifiable = true
     vim.api.nvim_buf_set_lines(DepUI.buf, 0, -1, false, lines)
     vim.bo[DepUI.buf].modifiable = false
+
+    -- Apply highlights
+    local ns = vim.api.nvim_create_namespace("SpringBootDepUI")
+    vim.api.nvim_buf_clear_namespace(DepUI.buf, ns, 0, -1)
+    for _, h in ipairs(highlights) do
+        vim.api.nvim_buf_set_extmark(DepUI.buf, ns, h[1] - 1, h[2], {
+            end_col = h[3] == -1 and #lines[h[1]] or h[3],
+            hl_group = h[4],
+        })
+    end
 end
 
 -------------------------------------------------
