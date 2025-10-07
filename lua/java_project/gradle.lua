@@ -63,7 +63,7 @@ local function gradle_new_project()
     -------------------------
     -- 'echo no' pipes "no" to the interactive prompt, preventing it from hanging.
     local gradle_cmd = string.format(
-        "echo no | gradle init --type %s --dsl %s --test-framework %s --package %s --project-name %s --no-daemon",
+        "echo no | gradle init --type %s --dsl %s --test-framework %s --package %s --project-name %s --no-daemon --use-defaults",
         project_type,
         script_dsl,
         test_framework,
